@@ -1,25 +1,25 @@
 <template>
-  <div class="flex gap-3" :class="isUser ? 'flex-row-reverse' : ''">
-    <!-- Avatar -->
+  <div class="flex gap-2.5" :class="isUser ? 'flex-row-reverse' : ''">
+    <!-- AI Avatar -->
     <div
       v-if="!isUser"
-      class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-primary text-white text-xs font-bold"
+      class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-[2px]"
     >
-      AI
+      <span class="text-[11px] font-bold text-white leading-none">AI</span>
     </div>
 
-    <div :class="isUser ? 'items-end' : 'items-start'" class="flex flex-col max-w-[80%]">
+    <div class="flex flex-col gap-1.5" :class="isUser ? 'items-end' : 'items-start'" style="max-width: 630px">
       <!-- Sender label -->
-      <span v-if="!isUser" class="text-xs text-gray-400 mb-1">
-        HireAI &middot; baru saja
+      <span v-if="!isUser" class="text-[11px] font-medium text-[#6b7280] leading-none">
+        HireAI · baru saja
       </span>
 
       <!-- Bubble -->
       <div
-        class="px-4 py-3 rounded-2xl text-sm leading-relaxed"
+        class="px-4 py-3 text-sm leading-[1.6] text-[#212121]"
         :class="isUser
-          ? 'bg-primary text-white rounded-br-md'
-          : 'bg-gray-100 text-gray-800 rounded-bl-md'"
+          ? 'bg-primary text-white rounded-tl-[16px] rounded-tr-[4px] rounded-bl-[16px] rounded-br-[16px]'
+          : 'bg-white border border-black/10 rounded-tl-[4px] rounded-tr-[16px] rounded-bl-[16px] rounded-br-[16px]'"
       >
         <slot />
       </div>

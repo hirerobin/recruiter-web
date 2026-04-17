@@ -9,8 +9,8 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#14B8A6', // teal from Figma
-          dark: '#0D9488',
+          DEFAULT: '#0abab5',
+          dark: '#089e9a',
           light: '#5EEAD4',
         },
         dark: {
@@ -23,7 +23,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['DM Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        syne: ['Syne', 'sans-serif'],
       },
     },
   },

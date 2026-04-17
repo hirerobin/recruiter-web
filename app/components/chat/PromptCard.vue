@@ -1,12 +1,12 @@
 <template>
   <button
-    class="w-full text-left p-4 border border-gray-200 rounded-xl hover:border-primary hover:bg-primary/5 transition-all group"
+    class="w-full text-left bg-white border border-black/10 rounded-[10px] pt-[13px] pb-px px-[17px] flex flex-col gap-1 hover:border-primary hover:bg-primary/5 transition-all"
     @click="$emit('select', title)"
   >
-    <p class="text-sm font-medium text-gray-800 group-hover:text-primary">
+    <p class="text-[13px] font-medium text-[#212121] leading-[1.5]">
       {{ icon }} {{ title }}
     </p>
-    <p class="text-xs text-gray-400 mt-1">{{ description }}</p>
+    <p class="text-[11px] text-[#6b7280] leading-[1.5]">{{ description }}</p>
   </button>
 </template>
 

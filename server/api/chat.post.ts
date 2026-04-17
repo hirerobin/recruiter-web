@@ -1,18 +1,24 @@
-export default defineEventHandler(async (event) => {
+interface ChatRequestBody {
+  message: string
+  sessionId: string
+}
+
+interface ChatApiResponse {
+  reply: string
+}
+
+export default defineEventHandler(async (event): Promise<ChatApiResponse> => {
   const config = useRuntimeConfig()
-  const body = await readBody(event)
+  const body = await readBody<ChatRequestBody>(event)
 
   try {
-    // Proxy to recruiter-ai backend
-    const res = await $fetch(`${config.public.apiBaseUrl}/api/web/chat`, {
+    const res = await $fetch<ChatApiResponse>(`${config.public.apiBaseUrl}/api/web/chat`, {
       method: 'POST',
-      body: { message: body.message },
+      body: { message: body.message, sessionId: body.sessionId },
     })
     return res
-  } catch (error: any) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: error.message || 'Backend unavailable',
-    })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Backend unavailable'
+    throw createError({ statusCode: 500, statusMessage: message })
   }
 })

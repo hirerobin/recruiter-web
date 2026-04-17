@@ -1,34 +1,45 @@
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
+import type { Message, ChatApiResponse } from '~/types/chat'
+
+interface UseChatReturn {
+  messages: Ref<Message[]>
+  loading: Ref<boolean>
+  sendMessage: (text: string) => Promise<void>
 }
 
-export function useChat() {
-  const config = useRuntimeConfig()
-  const messages = ref<Message[]>([])
-  const loading = ref(false)
+function getSessionId(): string {
+  const key = 'hireai_session_id'
+  let id = localStorage.getItem(key)
+  if (!id) {
+    id = `web-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    localStorage.setItem(key, id)
+  }
+  return id
+}
 
-  // Add initial AI greeting
-  messages.value.push({
-    id: 'greeting',
-    role: 'assistant',
-    content: '👋 Hai! Saya adalah asisten rekrutmen AI Anda. Saya di sini untuk membantu Anda menemukan kesempatan kerja yang sempurna. Posisi apa yang Anda cari?',
-  })
+export function useChat(): UseChatReturn {
+  const messages = ref<Message[]>([
+    {
+      id: 'greeting',
+      role: 'assistant',
+      content: '👋 Hai! Saya adalah asisten rekrutmen AI Anda. Saya di sini untuk membantu Anda menemukan kesempatan kerja yang sempurna. Posisi apa yang Anda cari?',
+    },
+  ])
 
-  async function sendMessage(text: string) {
-    const userMsg: Message = {
+  const loading = ref<boolean>(false)
+
+  async function sendMessage(text: string): Promise<void> {
+    messages.value.push({
       id: `user-${Date.now()}`,
       role: 'user',
       content: text,
-    }
-    messages.value.push(userMsg)
+    })
+
     loading.value = true
 
     try {
-      const res = await $fetch<{ reply: string }>('/api/chat', {
+      const res = await $fetch<ChatApiResponse>('/api/chat', {
         method: 'POST',
-        body: { message: text },
+        body: { message: text, sessionId: getSessionId() },
       })
 
       messages.value.push({
