@@ -8,10 +8,10 @@
       <span class="text-[11px] font-bold text-white leading-none">AI</span>
     </div>
 
-    <div class="flex flex-col gap-1.5" :class="isUser ? 'items-end' : 'items-start'" style="max-width: 630px">
+    <div class="flex flex-col gap-1.5" :class="isUser ? 'items-end' : 'items-start'" style="max-width: min(630px, 85vw)">
       <!-- Sender label -->
       <span v-if="!isUser" class="text-[11px] font-medium text-[#6b7280] leading-none">
-        HireAI · baru saja
+        HireAI · baru saja sekarang
       </span>
 
       <!-- Bubble -->

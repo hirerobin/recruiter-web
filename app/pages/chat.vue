@@ -3,8 +3,8 @@
     <ChatHeader />
 
     <!-- Messages area -->
-    <div ref="messagesRef" class="flex-1 overflow-y-auto pt-8 px-[87.5px]">
-      <div class="flex flex-col gap-6 max-w-[896px]">
+    <div ref="messagesRef" class="flex-1 overflow-y-auto pt-6 md:pt-8 px-4 md:px-[87.5px]">
+      <div class="flex flex-col gap-6 max-w-[896px] pb-4">
         <!-- Messages -->
         <ChatBubble
           v-for="msg in messages"
@@ -23,10 +23,10 @@
           </span>
         </ChatBubble>
 
-        <!-- Suggested prompts (only if no user messages yet) -->
-        <div v-if="messages.length <= 1" class="flex flex-col gap-3 mt-2">
+        <!-- Suggested prompts (only if no user messages yet and in chat mode) -->
+        <div v-if="messages.length <= 1 && chatMode === 'chat'" class="flex flex-col gap-3 mt-2">
           <p class="text-[10px] font-semibold uppercase tracking-[0.8px] text-[#6b7280]">Coba tanyakan:</p>
-          <div class="grid gap-[8px] w-[448px]">
+          <div class="grid gap-[8px] w-full md:w-[448px]">
             <PromptCard
               v-for="prompt in prompts"
               :key="prompt.title"
@@ -37,11 +37,48 @@
             />
           </div>
         </div>
+
+        <!-- FSM: Consent -->
+        <ChatBubble v-if="chatMode === 'consent'">
+          <ConsentCard :job-title="appliedJob" @agree="agreeConsent" @decline="declineConsent" />
+        </ChatBubble>
+
+        <!-- FSM: Data collection questions -->
+        <ChatBubble v-if="chatMode === 'data-collection' && currentQuestion">
+          <QuestionCard
+            :key="currentQuestionIndex"
+            :question="currentQuestion"
+            :index="currentQuestionIndex"
+            :total="totalQuestions"
+            @submit="submitAnswer"
+          />
+        </ChatBubble>
+
+        <!-- FSM: Scoring -->
+        <ChatBubble v-if="chatMode === 'scoring'">
+          <ScoringCard :passed="scoringPassed" :score="scoringScore" />
+        </ChatBubble>
+
+        <!-- FSM: Interview slot picker -->
+        <ChatBubble v-if="chatMode === 'interview-slots'">
+          <InterviewSlots :slots="slots" @book="bookSlot" />
+        </ChatBubble>
+
+        <!-- FSM: Booking confirmed -->
+        <ChatBubble v-if="chatMode === 'confirmed' && bookedSlot">
+          <BookingConfirmed
+            :slot="bookedSlot"
+            :job-title="appliedJob"
+            :candidate-name="candidateName"
+            @done="reset"
+          />
+        </ChatBubble>
       </div>
     </div>
 
-    <!-- Input -->
+    <!-- Input (hidden during FSM flow) -->
     <ChatInput
+      v-if="chatMode === 'chat'"
       :loading="loading"
       @send="handleSend"
     />
@@ -53,11 +90,22 @@ import ChatHeader from '~/components/chat/ChatHeader.vue'
 import ChatBubble from '~/components/chat/ChatBubble.vue'
 import ChatInput from '~/components/chat/ChatInput.vue'
 import PromptCard from '~/components/chat/PromptCard.vue'
+import ConsentCard from '~/components/chat/ConsentCard.vue'
+import QuestionCard from '~/components/chat/QuestionCard.vue'
+import ScoringCard from '~/components/chat/ScoringCard.vue'
+import InterviewSlots from '~/components/chat/InterviewSlots.vue'
+import BookingConfirmed from '~/components/chat/BookingConfirmed.vue'
 import type { Prompt } from '~/types/chat'
 
 definePageMeta({ layout: false })
 
-const { messages, loading, sendMessage } = useChat()
+const {
+  messages, loading,
+  chatMode, appliedJob, currentQuestion, currentQuestionIndex, totalQuestions,
+  scoringPassed, scoringScore, slots, bookedSlot, candidateName,
+  sendMessage, agreeConsent, declineConsent, submitAnswer, bookSlot, reset,
+} = useChat()
+
 const messagesRef = ref<HTMLElement | null>(null)
 
 const prompts: Prompt[] = [
@@ -102,10 +150,14 @@ async function handlePrompt(text: string): Promise<void> {
 function scrollToBottom(): void {
   nextTick(() => {
     if (messagesRef.value) {
-      messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+      messagesRef.value.scrollTo({ top: messagesRef.value.scrollHeight, behavior: 'smooth' })
     }
   })
 }
+
+watch(() => messages.value.length, () => scrollToBottom())
+watch(chatMode, () => scrollToBottom())
+watch(scoringPassed, () => scrollToBottom())
 
 useHead({ title: 'Chat — HireAI' })
 </script>

@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-white">
-    <div class="max-w-4xl mx-auto">
+    <div class="max-w-4xl mx-auto overflow-x-hidden">
       <LandingHeader />
       <LandingHero />
       <LandingTelegramCard />

@@ -18,3 +18,11 @@ export interface ChatRequestBody {
 export interface ChatApiResponse {
   reply: string
 }
+
+export interface InterviewSlot {
+  date: string  // YYYY-MM-DD
+  time: string  // HH:MM
+  label: string // "Senin, 7 Apr 09:00"
+}
+
+export type ChatMode = 'chat' | 'consent' | 'data-collection' | 'scoring' | 'interview-slots' | 'confirmed'
