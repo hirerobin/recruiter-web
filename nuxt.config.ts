@@ -20,7 +20,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBaseUrl: 'http://localhost:3000',
+      apiBaseUrl: 'https://pre-recruitment-ai.myrobin.id',
     },
   },
 })
