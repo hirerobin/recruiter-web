@@ -142,8 +142,10 @@ const prompts: Prompt[] = [
 ]
 
 function formatMessage(content: string): string {
-  if (!content) return ''
-  return content
+  if (content == null) return ''
+  const s = String(content)
+  if (!s) return ''
+  return s
     .replaceAll('\n', '<br>')
     .replaceAll(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
 }
