@@ -23,7 +23,7 @@
           </span>
         </ChatBubble>
 
-        <!-- Suggested prompts (only if no user messages yet and in chat mode) -->
+        <!-- Suggested prompts (only initial chat state) -->
         <div v-if="messages.length <= 1 && chatMode === 'chat'" class="flex flex-col gap-3 mt-2">
           <p class="text-[10px] font-semibold uppercase tracking-[0.8px] text-[#6b7280]">Coba tanyakan:</p>
           <div class="grid gap-[8px] w-full md:w-[448px]">
@@ -43,40 +43,50 @@
           <ConsentCard :job-title="appliedJob" @agree="agreeConsent" @decline="declineConsent" />
         </ChatBubble>
 
-        <!-- FSM: Data collection questions -->
-        <ChatBubble v-if="chatMode === 'data-collection' && currentQuestion">
+        <!-- FSM: Data collection / file upload -->
+        <ChatBubble v-if="(chatMode === 'data-collection' || chatMode === 'file-upload') && currentQuestion">
           <QuestionCard
-            :key="currentQuestionIndex"
+            :key="`${questionIndex}-${uploadPage}`"
             :question="currentQuestion"
-            :index="currentQuestionIndex"
+            :index="questionIndex"
             :total="totalQuestions"
+            :upload-page="uploadPage"
+            :disabled="loading"
             @submit="submitAnswer"
+            @upload="uploadFile"
           />
         </ChatBubble>
 
-        <!-- FSM: Scoring -->
+        <!-- FSM: Scoring animation -->
         <ChatBubble v-if="chatMode === 'scoring'">
-          <ScoringCard :passed="scoringPassed" :score="scoringScore" />
+          <ScoringCard :passed="passed" :score="score" />
         </ChatBubble>
 
-        <!-- FSM: Interview slot picker -->
-        <ChatBubble v-if="chatMode === 'interview-slots'">
-          <InterviewSlots :slots="slots" @book="bookSlot" />
+        <!-- FSM: Pass — interview link -->
+        <ChatBubble v-if="chatMode === 'pass'">
+          <PassCard :interview-url="interviewUrl" @restart="resetChat" />
         </ChatBubble>
 
-        <!-- FSM: Booking confirmed -->
-        <ChatBubble v-if="chatMode === 'confirmed' && bookedSlot">
-          <BookingConfirmed
-            :slot="bookedSlot"
-            :job-title="appliedJob"
-            :candidate-name="candidateName"
-            @done="reset"
-          />
+        <!-- FSM: Fail — restart button -->
+        <ChatBubble v-if="chatMode === 'fail'">
+          <div class="flex flex-col items-center gap-3 py-2 w-full max-w-[380px]">
+            <button
+              @click="resetChat"
+              class="bg-gray-100 text-gray-700 rounded-xl py-2.5 px-6 text-sm font-medium hover:bg-gray-200 transition-colors"
+            >
+              Lihat lowongan lain
+            </button>
+          </div>
+        </ChatBubble>
+
+        <!-- FSM: Interview completed -->
+        <ChatBubble v-if="chatMode === 'interview-completed'">
+          <InterviewCompleteCard @restart="resetChat" />
         </ChatBubble>
       </div>
     </div>
 
-    <!-- Input (hidden during FSM flow) -->
+    <!-- Input: only in free-chat mode -->
     <ChatInput
       v-if="chatMode === 'chat'"
       :loading="loading"
@@ -93,17 +103,17 @@ import PromptCard from '~/components/chat/PromptCard.vue'
 import ConsentCard from '~/components/chat/ConsentCard.vue'
 import QuestionCard from '~/components/chat/QuestionCard.vue'
 import ScoringCard from '~/components/chat/ScoringCard.vue'
-import InterviewSlots from '~/components/chat/InterviewSlots.vue'
-import BookingConfirmed from '~/components/chat/BookingConfirmed.vue'
+import PassCard from '~/components/chat/PassCard.vue'
+import InterviewCompleteCard from '~/components/chat/InterviewCompleteCard.vue'
 import type { Prompt } from '~/types/chat'
 
 definePageMeta({ layout: false })
 
 const {
   messages, loading,
-  chatMode, appliedJob, currentQuestion, currentQuestionIndex, totalQuestions,
-  scoringPassed, scoringScore, slots, bookedSlot, candidateName,
-  sendMessage, agreeConsent, declineConsent, submitAnswer, bookSlot, reset,
+  chatMode, appliedJob, currentQuestion, questionIndex, totalQuestions,
+  uploadPage, score, passed, interviewUrl,
+  sendMessage, agreeConsent, declineConsent, submitAnswer, uploadFile, resetChat,
 } = useChat()
 
 const messagesRef = ref<HTMLElement | null>(null)
@@ -126,15 +136,15 @@ const prompts: Prompt[] = [
   },
   {
     icon: '💼',
-    title: 'Tampilkan posisi UX jarak jauh untuk saya',
+    title: 'Tampilkan posisi yang tersedia',
     description: 'Saring pekerjaan berdasarkan lokasi dan peran',
   },
 ]
 
 function formatMessage(content: string): string {
   return content
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replaceAll('\n', '<br>')
+    .replaceAll(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
 }
 
 async function handleSend(text: string): Promise<void> {
@@ -157,7 +167,7 @@ function scrollToBottom(): void {
 
 watch(() => messages.value.length, () => scrollToBottom())
 watch(chatMode, () => scrollToBottom())
-watch(scoringPassed, () => scrollToBottom())
+watch(passed, () => scrollToBottom())
 
 useHead({ title: 'Chat — HireAI' })
 </script>

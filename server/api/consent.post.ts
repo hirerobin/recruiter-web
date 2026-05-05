@@ -2,10 +2,10 @@ import type { WebApiResponse } from '~/types/chat'
 
 export default defineEventHandler(async (event): Promise<WebApiResponse> => {
   const config = useRuntimeConfig()
-  const body = await readBody<{ message: string; sessionId: string }>(event)
+  const body = await readBody<{ action: 'agree' | 'decline'; sessionId: string }>(event)
 
   try {
-    return await $fetch<WebApiResponse>(`${config.public.apiBaseUrl}/api/web/chat`, {
+    return await $fetch<WebApiResponse>(`${config.public.apiBaseUrl}/api/web/consent`, {
       method: 'POST',
       body,
     })

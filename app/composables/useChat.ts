@@ -1,113 +1,108 @@
-import type { Message, ChatApiResponse, InterviewSlot, ChatMode } from '~/types/chat'
+import type { Message, WebApiResponse, WebQuestion, WebFsmState, ChatMode } from '~/types/chat'
 
-interface Question {
-  question: string
-  type: 'text' | 'select'
-  choices?: string[]
+const STATE_TO_MODE: Record<WebFsmState, ChatMode> = {
+  candidate_asking: 'chat',
+  consent: 'consent',
+  data_collection: 'data-collection',
+  file_upload: 'file-upload',
+  scoring: 'scoring',
+  pass: 'pass',
+  fail: 'fail',
+  interview_completed: 'interview-completed',
+  escalated: 'chat',
 }
 
-const MOCK_QUESTIONS: Question[] = [
-  { question: 'Siapa nama lengkap Anda?', type: 'text' },
-  { question: 'Nomor telepon aktif Anda?', type: 'text' },
-  { question: 'Tanggal lahir Anda? (DD/MM/YYYY)', type: 'text' },
-  { question: 'Pendidikan terakhir Anda?', type: 'select', choices: ['SMP', 'SMA/SMK', 'D3', 'S1', 'S2'] },
-  { question: 'Domisili Anda saat ini?', type: 'text' },
-  { question: 'Nomor NIK (16 digit)?', type: 'text' },
-]
+const SESSION_KEY = 'hireai_session_id'
 
-function generateSlots(): InterviewSlot[] {
-  const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
-  const slots: InterviewSlot[] = []
-  const today = new Date()
-  let daysAdded = 0
-  let offset = 1
-
-  while (daysAdded < 3 && offset <= 14) {
-    const d = new Date(today)
-    d.setDate(today.getDate() + offset)
-    const dow = d.getDay()
-
-    if (dow >= 1 && dow <= 5) {
-      const dateStr = d.toISOString().slice(0, 10)
-      for (let h = 9; h < 17; h++) {
-        for (const m of [0, 30]) {
-          if (slots.filter(s => s.date === dateStr).length >= 6) break
-          const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-          slots.push({
-            date: dateStr,
-            time,
-            label: `${dayNames[dow]}, ${d.getDate()} ${monthNames[d.getMonth()]} ${time}`,
-          })
-        }
-      }
-      daysAdded++
-    }
-    offset++
-  }
-  return slots
+function makeSessionId(): string {
+  return `web-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 function getSessionId(): string {
-  const key = 'hireai_session_id'
-  let id = localStorage.getItem(key)
+  if (!import.meta.client) return makeSessionId()
+  let id = localStorage.getItem(SESSION_KEY)
   if (!id) {
-    id = `web-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    localStorage.setItem(key, id)
+    id = makeSessionId()
+    localStorage.setItem(SESSION_KEY, id)
   }
   return id
 }
 
-export function useChat() {
-  const messages = ref<Message[]>([
-    {
-      id: 'greeting',
-      role: 'assistant',
-      content: '👋 Hai! Saya adalah asisten rekrutmen AI Anda. Saya di sini untuk membantu Anda menemukan kesempatan kerja yang sempurna. Posisi apa yang Anda cari?',
-    },
-  ])
+function clearSessionId(): void {
+  if (import.meta.client) localStorage.removeItem(SESSION_KEY)
+}
 
+const INITIAL_MESSAGE: Message = {
+  id: 'greeting',
+  role: 'assistant',
+  content: '👋 Hai! Saya adalah asisten rekrutmen AI Anda. Saya di sini untuk membantu Anda menemukan kesempatan kerja yang sempurna. Posisi apa yang Anda cari?',
+}
+
+export function useChat() {
+  const messages = ref<Message[]>([{ ...INITIAL_MESSAGE }])
   const loading = ref(false)
   const chatMode = ref<ChatMode>('chat')
-  const appliedJob = ref('')
-  const answers = ref<string[]>([])
-  const currentQuestionIndex = ref(0)
-  const scoringPassed = ref<boolean | null>(null)
-  const scoringScore = ref(0)
-  const slots = ref<InterviewSlot[]>([])
-  const bookedSlot = ref<InterviewSlot | null>(null)
 
-  const currentQuestion = computed<Question | null>(() => MOCK_QUESTIONS[currentQuestionIndex.value] ?? null)
-  const totalQuestions = MOCK_QUESTIONS.length
-  const candidateName = computed(() => answers.value[0] || 'Anda')
+  const appliedJob = ref('')
+  const appliedJobLocation = ref('')
+  const currentQuestion = ref<WebQuestion | null>(null)
+  const questionIndex = ref(0)
+  const totalQuestions = ref(0)
+  const uploadPage = ref(1)
+  const uploadCount = ref(1)
+  const score = ref(0)
+  const passed = ref<boolean | null>(null)
+  const interviewUrl = ref('')
 
   function addBot(content: string) {
-    messages.value.push({ id: `ai-${Date.now()}`, role: 'assistant', content })
+    messages.value.push({ id: `ai-${Date.now()}-${Math.random()}`, role: 'assistant', content })
   }
 
   function addUser(content: string) {
     messages.value.push({ id: `user-${Date.now()}`, role: 'user', content })
   }
 
-  async function sendMessage(text: string): Promise<void> {
-    addUser(text)
+  function patchRefs(res: WebApiResponse) {
+    if (res.question) currentQuestion.value = res.question
+    if (res.questionIndex !== undefined) questionIndex.value = res.questionIndex
+    if (res.totalQuestions !== undefined) totalQuestions.value = res.totalQuestions
+    if (res.uploadPage !== undefined) uploadPage.value = res.uploadPage
+    if (res.uploadCount !== undefined) uploadCount.value = res.uploadCount
+    if (res.appliedJob) appliedJob.value = res.appliedJob
+    if (res.appliedJobLocation) appliedJobLocation.value = res.appliedJobLocation
+    if (res.score !== undefined) score.value = res.score
+    if (res.interviewUrl) interviewUrl.value = res.interviewUrl
+  }
 
-    if (/daftar/i.test(text.trim())) {
-      const lastAI = [...messages.value].reverse().find(m => m.role === 'assistant')
-      const jobMatch = lastAI?.content.match(/<b>(.*?)<\/b>/)?.[1] ?? 'posisi yang Anda pilih'
-      addBot(`Baik! Saya akan membantu Anda mendaftar untuk posisi <strong>${jobMatch}</strong>. Sebelum melanjutkan, harap baca dan setujui persyaratan berikut.`)
-      appliedJob.value = jobMatch
-      chatMode.value = 'consent'
+  function applyResponse(res: WebApiResponse, skipAnimation = false) {
+    for (const msg of res.messages) addBot(msg)
+    patchRefs(res)
+
+    const isTerminal = res.state === 'pass' || res.state === 'fail'
+    if (!isTerminal) {
+      chatMode.value = STATE_TO_MODE[res.state] ?? 'chat'
       return
     }
 
+    passed.value = res.passed ?? (res.state === 'pass')
+    if (skipAnimation) {
+      chatMode.value = STATE_TO_MODE[res.state]
+    } else {
+      // Brief scoring animation then land on pass/fail
+      chatMode.value = 'scoring'
+      setTimeout(() => { chatMode.value = STATE_TO_MODE[res.state] }, 2000)
+    }
+  }
+
+  async function sendMessage(text: string): Promise<void> {
+    addUser(text)
     loading.value = true
     try {
-      const res = await $fetch<ChatApiResponse>('/api/chat', {
+      const res = await $fetch<WebApiResponse>('/api/chat', {
         method: 'POST',
         body: { message: text, sessionId: getSessionId() },
       })
-      addBot(res.reply)
+      applyResponse(res)
     } catch {
       addBot('⚠️ Maaf, terjadi gangguan teknis. Silakan coba lagi.')
     } finally {
@@ -115,76 +110,132 @@ export function useChat() {
     }
   }
 
-  function agreeConsent() {
+  async function agreeConsent(): Promise<void> {
     addUser('✅ Saya menyetujui persyaratan')
-    answers.value = []
-    currentQuestionIndex.value = 0
-    chatMode.value = 'data-collection'
-  }
-
-  function declineConsent() {
-    addUser('❌ Tidak, terima kasih')
-    addBot('Tidak masalah! Jika ada pertanyaan lain, saya siap membantu. 😊')
-    chatMode.value = 'chat'
-  }
-
-  function submitAnswer(answer: string) {
-    addUser(answer)
-    answers.value[currentQuestionIndex.value] = answer
-    currentQuestionIndex.value++
-    if (currentQuestionIndex.value >= MOCK_QUESTIONS.length) {
-      scoringPassed.value = null
-      chatMode.value = 'scoring'
-      runScoring()
+    loading.value = true
+    try {
+      const res = await $fetch<WebApiResponse>('/api/consent', {
+        method: 'POST',
+        body: { action: 'agree', sessionId: getSessionId() },
+      })
+      applyResponse(res)
+    } catch {
+      addBot('⚠️ Terjadi kesalahan. Silakan coba lagi.')
+    } finally {
+      loading.value = false
     }
   }
 
-  async function runScoring() {
-    await new Promise(r => setTimeout(r, 3000))
-    const score = Math.floor(Math.random() * 20) + 75
-    scoringScore.value = score
-    scoringPassed.value = true
-    await new Promise(r => setTimeout(r, 1800))
-    addBot(`✅ Profil Anda lulus seleksi awal dengan skor <strong>${score}/100</strong>! Silakan pilih jadwal wawancara berikut.`)
-    slots.value = generateSlots()
-    chatMode.value = 'interview-slots'
+  async function declineConsent(): Promise<void> {
+    addUser('❌ Tidak, terima kasih')
+    chatMode.value = 'chat'
+    try {
+      const res = await $fetch<WebApiResponse>('/api/consent', {
+        method: 'POST',
+        body: { action: 'decline', sessionId: getSessionId() },
+      })
+      for (const msg of res.messages) addBot(msg)
+    } catch {
+      addBot('Tidak masalah! Jika ada pertanyaan lain, saya siap membantu. 😊')
+    }
   }
 
-  function bookSlot(slot: InterviewSlot) {
-    bookedSlot.value = slot
-    chatMode.value = 'confirmed'
+  async function submitAnswer(answer: string): Promise<void> {
+    addUser(answer)
+    loading.value = true
+    try {
+      const res = await $fetch<WebApiResponse>('/api/chat', {
+        method: 'POST',
+        body: { message: answer, sessionId: getSessionId() },
+      })
+      applyResponse(res)
+    } catch {
+      addBot('⚠️ Terjadi kesalahan. Silakan coba lagi.')
+    } finally {
+      loading.value = false
+    }
   }
 
-  function reset() {
-    addBot('Wawancara telah dijadwalkan! Ada yang bisa saya bantu lagi? 😊')
+  async function uploadFile(file: File): Promise<void> {
+    addUser(`📎 ${file.name}`)
+    loading.value = true
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('sessionId', getSessionId())
+      const res = await $fetch<WebApiResponse>('/api/upload', {
+        method: 'POST',
+        body: form,
+      })
+      applyResponse(res)
+    } catch {
+      addBot('⚠️ Upload gagal. Silakan coba lagi.')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function restoreSession(): Promise<void> {
+    const sessionId = getSessionId()
+    try {
+      const res = await $fetch<WebApiResponse>(`/api/state?sessionId=${sessionId}`)
+      if (!res || res.state === 'candidate_asking' || res.state === 'escalated') return
+      addBot('💬 Melanjutkan sesi sebelumnya...')
+      applyResponse(res, true)
+    } catch {
+      // Session expired or network error — start fresh silently
+    }
+  }
+
+  function resetChat(): void {
+    clearSessionId()
+    messages.value = [{ ...INITIAL_MESSAGE }]
     chatMode.value = 'chat'
     appliedJob.value = ''
-    answers.value = []
-    currentQuestionIndex.value = 0
-    scoringPassed.value = null
-    bookedSlot.value = null
-    slots.value = []
+    appliedJobLocation.value = ''
+    currentQuestion.value = null
+    questionIndex.value = 0
+    totalQuestions.value = 0
+    uploadPage.value = 1
+    uploadCount.value = 1
+    score.value = 0
+    passed.value = null
+    interviewUrl.value = ''
   }
+
+  onMounted(() => {
+    restoreSession()
+
+    if (import.meta.client && 'BroadcastChannel' in globalThis) {
+      const bc = new BroadcastChannel('hireai_interview')
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'interview_complete' && e.data?.sessionId === getSessionId()) {
+          chatMode.value = 'interview-completed'
+        }
+      }
+      onUnmounted(() => bc.close())
+    }
+  })
 
   return {
     messages,
     loading,
     chatMode,
     appliedJob,
-    answers,
-    currentQuestionIndex,
+    appliedJobLocation,
     currentQuestion,
+    questionIndex,
     totalQuestions,
-    scoringPassed,
-    scoringScore,
-    slots,
-    bookedSlot,
-    candidateName,
+    uploadPage,
+    uploadCount,
+    score,
+    passed,
+    interviewUrl,
     sendMessage,
     agreeConsent,
     declineConsent,
     submitAnswer,
-    bookSlot,
-    reset,
+    uploadFile,
+    resetChat,
   }
 }

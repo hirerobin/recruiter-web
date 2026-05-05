@@ -10,19 +10,48 @@ export interface Prompt {
   description: string
 }
 
-export interface ChatRequestBody {
-  message: string
-  sessionId: string
+export type WebFsmState =
+  | 'candidate_asking'
+  | 'consent'
+  | 'data_collection'
+  | 'file_upload'
+  | 'scoring'
+  | 'pass'
+  | 'fail'
+  | 'interview_completed'
+  | 'escalated'
+
+export interface WebQuestion {
+  questionNumber: string
+  text: string
+  type: 'Text' | 'Number' | 'Date' | 'Boolean' | 'Upload Docs'
+  choices?: string[]
+  rules?: string
+  uploadCount?: number
 }
 
-export interface ChatApiResponse {
-  reply: string
+export interface WebApiResponse {
+  state: WebFsmState
+  messages: string[]
+  question?: WebQuestion
+  questionIndex?: number
+  totalQuestions?: number
+  uploadPage?: number
+  uploadCount?: number
+  appliedJob?: string
+  appliedJobLocation?: string
+  score?: number
+  passed?: boolean
+  interviewUrl?: string
+  failReason?: string
 }
 
-export interface InterviewSlot {
-  date: string  // YYYY-MM-DD
-  time: string  // HH:MM
-  label: string // "Senin, 7 Apr 09:00"
-}
-
-export type ChatMode = 'chat' | 'consent' | 'data-collection' | 'scoring' | 'interview-slots' | 'confirmed'
+export type ChatMode =
+  | 'chat'
+  | 'consent'
+  | 'data-collection'
+  | 'file-upload'
+  | 'scoring'
+  | 'pass'
+  | 'fail'
+  | 'interview-completed'
