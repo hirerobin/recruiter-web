@@ -18,6 +18,16 @@ logs
 .fleet
 .idea
 
+# AI assistant tooling
+.claude
+.trae
+.cursor
+.copilot
+.codeium
+.aider*
+.continue
+.windsurf
+
 # Local env files
 .env
 .env.*
