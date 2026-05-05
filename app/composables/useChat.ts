@@ -39,6 +39,9 @@ const INITIAL_MESSAGE: Message = {
 }
 
 export function useChat() {
+  const config = useRuntimeConfig()
+  const apiBase = (config.public.apiBaseUrl as string) || 'http://localhost:3000'
+
   const messages = ref<Message[]>([{ ...INITIAL_MESSAGE }])
   const loading = ref(false)
   const chatMode = ref<ChatMode>('chat')
@@ -55,7 +58,7 @@ export function useChat() {
   const interviewUrl = ref('')
 
   function addBot(content: string) {
-    messages.value.push({ id: `ai-${Date.now()}-${Math.random()}`, role: 'assistant', content })
+    messages.value.push({ id: `ai-${Date.now()}-${Math.random()}`, role: 'assistant', content: content ?? '' })
   }
 
   function addUser(content: string) {
@@ -75,7 +78,7 @@ export function useChat() {
   }
 
   function applyResponse(res: WebApiResponse, skipAnimation = false) {
-    for (const msg of res.messages) addBot(msg)
+    for (const msg of res.messages ?? []) addBot(msg)
     patchRefs(res)
 
     const isTerminal = res.state === 'pass' || res.state === 'fail'
@@ -88,7 +91,6 @@ export function useChat() {
     if (skipAnimation) {
       chatMode.value = STATE_TO_MODE[res.state]
     } else {
-      // Brief scoring animation then land on pass/fail
       chatMode.value = 'scoring'
       setTimeout(() => { chatMode.value = STATE_TO_MODE[res.state] }, 2000)
     }
@@ -98,7 +100,7 @@ export function useChat() {
     addUser(text)
     loading.value = true
     try {
-      const res = await $fetch<WebApiResponse>('/api/chat', {
+      const res = await $fetch<WebApiResponse>(`${apiBase}/api/web/chat`, {
         method: 'POST',
         body: { message: text, sessionId: getSessionId() },
       })
@@ -114,7 +116,7 @@ export function useChat() {
     addUser('✅ Saya menyetujui persyaratan')
     loading.value = true
     try {
-      const res = await $fetch<WebApiResponse>('/api/consent', {
+      const res = await $fetch<WebApiResponse>(`${apiBase}/api/web/consent`, {
         method: 'POST',
         body: { action: 'agree', sessionId: getSessionId() },
       })
@@ -130,11 +132,11 @@ export function useChat() {
     addUser('❌ Tidak, terima kasih')
     chatMode.value = 'chat'
     try {
-      const res = await $fetch<WebApiResponse>('/api/consent', {
+      const res = await $fetch<WebApiResponse>(`${apiBase}/api/web/consent`, {
         method: 'POST',
         body: { action: 'decline', sessionId: getSessionId() },
       })
-      for (const msg of res.messages) addBot(msg)
+      for (const msg of res.messages ?? []) addBot(msg)
     } catch {
       addBot('Tidak masalah! Jika ada pertanyaan lain, saya siap membantu. 😊')
     }
@@ -144,7 +146,7 @@ export function useChat() {
     addUser(answer)
     loading.value = true
     try {
-      const res = await $fetch<WebApiResponse>('/api/chat', {
+      const res = await $fetch<WebApiResponse>(`${apiBase}/api/web/chat`, {
         method: 'POST',
         body: { message: answer, sessionId: getSessionId() },
       })
@@ -163,7 +165,7 @@ export function useChat() {
       const form = new FormData()
       form.append('file', file)
       form.append('sessionId', getSessionId())
-      const res = await $fetch<WebApiResponse>('/api/upload', {
+      const res = await $fetch<WebApiResponse>(`${apiBase}/api/web/upload`, {
         method: 'POST',
         body: form,
       })
@@ -178,7 +180,7 @@ export function useChat() {
   async function restoreSession(): Promise<void> {
     const sessionId = getSessionId()
     try {
-      const res = await $fetch<WebApiResponse>(`/api/state?sessionId=${sessionId}`)
+      const res = await $fetch<WebApiResponse>(`${apiBase}/api/web/state/${sessionId}`)
       if (!res || res.state === 'candidate_asking' || res.state === 'escalated') return
       addBot('💬 Melanjutkan sesi sebelumnya...')
       applyResponse(res, true)
